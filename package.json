@@ -1,0 +1,12 @@
+{
+  "name": "class-vocab-widget",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker that collects several Word of the Day feeds for a class website widget.",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

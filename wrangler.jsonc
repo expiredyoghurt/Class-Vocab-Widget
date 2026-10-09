@@ -1,0 +1,20 @@
+{
+  // IMPORTANT: this name must match the Worker name you choose in Cloudflare.
+  "name": "class-vocab-widget",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+
+  "triggers": {
+    // minute hour day-of-month month day-of-week   (always UTC)
+    // "30 7 * * *" = every day (Mon-Sun) at 07:30 UTC
+    "crons": ["30 7 * * *"]
+  },
+
+  "kv_namespaces": [
+    {
+      "binding": "VOCAB_STORE",
+      // 👉 Replace the text below with your KV namespace ID (see README, Step 2)
+      "id": "PASTE_YOUR_KV_NAMESPACE_ID_HERE"
+    }
+  ]
+}

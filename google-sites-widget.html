@@ -1,0 +1,90 @@
+<!--
+  GOOGLE SITES EMBED CODE
+  1. Replace WORKER_URL (near the bottom) with your Worker's address.
+  2. In Google Sites: Insert > Embed > "Embed code" tab > paste ALL of this > Next > Insert.
+  3. Drag the embed box to about 620px tall.
+-->
+<div id="wotd">
+  <h2 class="title">📚 Words of the Day</h2>
+  <div id="status" class="status">Fetching today's words<span class="dots"></span></div>
+  <div id="cards" class="cards" hidden></div>
+  <div id="updated" class="updated"></div>
+</div>
+
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  #wotd { font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; padding: 14px; color: #1f2937; }
+  .title { margin: 0 0 14px; font-size: 22px; text-align: center; }
+  .status { text-align: center; padding: 40px 10px; color: #6b7280; font-size: 16px; }
+  .dots::after { content: ""; animation: dots 1.4s steps(4, end) infinite; }
+  @keyframes dots { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; animation: fade .5s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } }
+  .card { border-radius: 16px; padding: 16px 18px; color: #fff; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+  .c-mw        { background: linear-gradient(135deg, #2563eb, #7c3aed); }
+  .c-wordsmith { background: linear-gradient(135deg, #ea580c, #db2777); }
+  .c-tfd       { background: linear-gradient(135deg, #059669, #0ea5e9); }
+  .c-nyt       { background: linear-gradient(135deg, #1f2937, #4b5563); }
+  .badge { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: .85; }
+  .word { font-size: 28px; font-weight: 700; margin: 0; line-height: 1.1; word-break: break-word; }
+  .meta { font-size: 14px; opacity: .9; font-style: italic; min-height: 1px; }
+  .def { font-size: 15.5px; line-height: 1.45; margin: 0; }
+  .foot { margin-top: auto; padding-top: 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .when { font-size: 12px; opacity: .75; }
+  .more { color: #fff; font-size: 13px; text-decoration: none; background: rgba(255,255,255,.2); padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
+  .more:hover { background: rgba(255,255,255,.35); }
+  .updated { text-align: center; font-size: 12px; color: #9ca3af; margin-top: 12px; }
+</style>
+
+<script>
+  // 👉 PASTE YOUR WORKER URL HERE (keep the quotes, no trailing slash)
+  const WORKER_URL = "https://class-vocab-widget.YOUR-SUBDOMAIN.workers.dev";
+
+  const statusEl = document.getElementById("status");
+  const cardsEl = document.getElementById("cards");
+
+  function el(tagName, className, text) {
+    const e = document.createElement(tagName);
+    if (className) e.className = className;
+    if (text) e.textContent = text;
+    return e;
+  }
+
+  function makeCard(w) {
+    const card = el("div", "card c-" + w.id);
+    card.append(el("div", "badge", w.source));
+    card.append(el("h3", "word", w.word));
+
+    const metaText = [w.partOfSpeech, w.pronunciation ? "\\" + w.pronunciation + "\\" : ""].filter(Boolean).join("  ·  ");
+    if (metaText) card.append(el("div", "meta", metaText));
+
+    card.append(el("p", "def", w.definition));
+
+    const foot = el("div", "foot");
+    const d = w.date ? new Date(w.date) : null;
+    foot.append(el("span", "when", d && !isNaN(d)
+      ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""));
+    const link = el("a", "more", "Learn more →");
+    link.href = w.url; link.target = "_blank"; link.rel = "noopener noreferrer";
+    foot.append(link);
+    card.append(foot);
+    return card;
+  }
+
+  fetch(WORKER_URL)
+    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(data => {
+      if (!data.words || !data.words.length) throw new Error("No words yet");
+      data.words.forEach(w => cardsEl.append(makeCard(w)));
+      if (data.words.length === 1) cardsEl.style.gridTemplateColumns = "1fr";
+      statusEl.hidden = true;
+      cardsEl.hidden = false;
+      document.getElementById("updated").textContent =
+        "Updated " + new Date(data.updatedAt).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+    })
+    .catch(() => {
+      statusEl.textContent = "Today's words aren't available right now. Please check back soon!";
+    });
+</script>
