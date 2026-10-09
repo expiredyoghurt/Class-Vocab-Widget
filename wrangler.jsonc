@@ -14,7 +14,7 @@
     {
       "binding": "VOCAB_STORE",
       // 👉 Replace the text below with your KV namespace ID (see README, Step 2)
-      "id": "PASTE_YOUR_KV_NAMESPACE_ID_HERE"
+      "id": "e9cc046565944f5b89e2096e27717030"
     }
   ]
 }
