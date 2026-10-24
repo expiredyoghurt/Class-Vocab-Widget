@@ -5,10 +5,12 @@ const TFD_FEED_URL = "http://www.thefreedictionary.com/_/WoD/rss.aspx";
 const NYT_FEED_URL =
   "https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/column/learning-word-of-the-day/rss.xml";
 const NYT_PAGE_URL = "https://www.nytimes.com/column/learning-word-of-the-day";
-const MAX_STALE_DAYS = 3; // if a source keeps failing, hide its old word after this many days
+const MAX_STALE_DAYS = 3;     // if a source keeps failing, hide its old word after this many days
+const HISTORY_DAYS = 14;      // how many days of past words to keep for the "Previous day" buttons
+const TIMEZONE = "UTC";       // decides which calendar day a harvest belongs to, e.g. "Asia/Singapore", "America/New_York"
 // ============================================
 
-const KV_KEY = "latest";
+const KV_KEY = "archive";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -171,12 +173,30 @@ const SOURCES = [
   { id: "nyt", run: getNYT },
 ];
 
-async function harvest(env) {
-  const previous = JSON.parse((await env.VOCAB_STORE.get(KV_KEY)) || "{}");
-  const prevById = Object.fromEntries((previous.words || []).map((w) => [w.id, w]));
-  const now = new Date();
-  const results = await Promise.allSettled(SOURCES.map((s) => s.run()));
+function dayKey(date) {
+  // "YYYY-MM-DD" in the chosen timezone
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(date);
+}
 
+// What the widget receives. "words" = today's words (kept so older widget code still works).
+function shape(archive) {
+  const days = archive.days || [];
+  return { updatedAt: archive.updatedAt, words: days.length ? days[0].words : [], days };
+}
+
+async function harvest(env) {
+  const archive = JSON.parse((await env.VOCAB_STORE.get(KV_KEY)) || '{"days":[]}');
+  const days = archive.days || [];
+  const now = new Date();
+  const today = dayKey(now);
+
+  // Most recent saved words per source, used if a source fails today
+  const prevById = {};
+  for (const d of days) for (const w of d.words) if (!prevById[w.id]) prevById[w.id] = w;
+
+  const results = await Promise.allSettled(SOURCES.map((s) => s.run()));
   const words = [];
   const errors = {};
   results.forEach((r, i) => {
@@ -192,9 +212,19 @@ async function harvest(env) {
     }
   });
 
-  const data = { updatedAt: now.toISOString(), words };
-  if (words.length) await env.VOCAB_STORE.put(KV_KEY, JSON.stringify(data));
-  return { data, errors };
+  if (words.length) {
+    // Replace today's entry if it already exists (e.g. a manual refresh), otherwise add it
+    const others = days.filter((d) => d.date !== today);
+    const updated = {
+      updatedAt: now.toISOString(),
+      days: [{ date: today, words }, ...others]
+        .sort((a, b) => (a.date < b.date ? 1 : -1))
+        .slice(0, HISTORY_DAYS),
+    };
+    await env.VOCAB_STORE.put(KV_KEY, JSON.stringify(updated));
+    return { data: shape(updated), errors };
+  }
+  return { data: shape(archive), errors };
 }
 
 // ---------- the Worker ----------
@@ -220,9 +250,13 @@ export default {
       });
     }
 
-    let stored = await env.VOCAB_STORE.get(KV_KEY);
-    if (!stored) stored = JSON.stringify((await harvest(env)).data); // very first visit
-    return new Response(stored, {
+    let body = await env.VOCAB_STORE.get(KV_KEY);
+    if (body) {
+      body = JSON.stringify(shape(JSON.parse(body)));
+    } else {
+      body = JSON.stringify((await harvest(env)).data); // very first visit
+    }
+    return new Response(body, {
       headers: {
         "Content-Type": "application/json; charset=utf-8",
         "Cache-Control": "public, max-age=300",

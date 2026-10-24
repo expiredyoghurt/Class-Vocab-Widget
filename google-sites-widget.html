@@ -2,10 +2,18 @@
   GOOGLE SITES EMBED CODE
   1. Replace WORKER_URL (near the bottom) with your Worker's address.
   2. In Google Sites: Insert > Embed > "Embed code" tab > paste ALL of this > Next > Insert.
-  3. Drag the embed box to about 620px tall.
+  3. Drag the embed box to about 680px tall.
 -->
 <div id="wotd">
   <h2 class="title">📚 Words of the Day</h2>
+
+  <div id="nav" class="nav" hidden>
+    <button id="older" class="btn" type="button">◀ Previous day</button>
+    <div id="dayLabel" class="daylabel"></div>
+    <button id="newer" class="btn" type="button">Next day ▶</button>
+  </div>
+  <div class="todaywrap"><button id="today" class="btn today" type="button" hidden>↩ Back to today</button></div>
+
   <div id="status" class="status">Fetching today's words<span class="dots"></span></div>
   <div id="cards" class="cards" hidden></div>
   <div id="updated" class="updated"></div>
@@ -15,13 +23,31 @@
   * { box-sizing: border-box; }
   body { margin: 0; }
   #wotd { font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; padding: 14px; color: #1f2937; }
-  .title { margin: 0 0 14px; font-size: 22px; text-align: center; }
+  .title { margin: 0 0 12px; font-size: 22px; text-align: center; }
+
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .daylabel { flex: 1; text-align: center; font-weight: 600; font-size: 15px; color: #374151; }
+  .btn { font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 0; border-radius: 999px;
+         padding: 9px 16px; background: #e0e7ff; color: #3730a3; transition: background .15s, transform .1s; white-space: nowrap; }
+  .btn:hover:not(:disabled) { background: #c7d2fe; }
+  .btn:active:not(:disabled) { transform: scale(.97); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn.today { background: #3730a3; color: #fff; }
+  .btn.today:hover { background: #312e81; }
+  .todaywrap { text-align: center; min-height: 1px; margin-bottom: 10px; }
+  .todaywrap .btn[hidden] { display: none; }
+
   .status { text-align: center; padding: 40px 10px; color: #6b7280; font-size: 16px; }
   .dots::after { content: ""; animation: dots 1.4s steps(4, end) infinite; }
   @keyframes dots { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} }
-  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; animation: fade .5s ease; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; animation: fade .45s ease; }
   @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } }
+  @media (max-width: 560px) {
+    .cards { grid-template-columns: 1fr; }
+    .nav { flex-wrap: wrap; }
+    .daylabel { order: -1; flex-basis: 100%; }
+    .nav .btn { flex: 1; }
+  }
   .card { border-radius: 16px; padding: 16px 18px; color: #fff; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
   .c-mw        { background: linear-gradient(135deg, #2563eb, #7c3aed); }
   .c-wordsmith { background: linear-gradient(135deg, #ea580c, #db2777); }
@@ -40,10 +66,15 @@
 
 <script>
   // 👉 PASTE YOUR WORKER URL HERE (keep the quotes, no trailing slash)
-  const WORKER_URL = "https://vocab-widget.englishgames.workers.dev/";
+  const WORKER_URL = "https://class-vocab-widget.YOUR-SUBDOMAIN.workers.dev";
 
-  const statusEl = document.getElementById("status");
-  const cardsEl = document.getElementById("cards");
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $("status"), cardsEl = $("cards"), navEl = $("nav");
+  const olderBtn = $("older"), newerBtn = $("newer"), todayBtn = $("today");
+
+  let days = [];   // newest first: [{ date: "2026-10-09", words: [...] }, ...]
+  let index = 0;   // 0 = today (the newest day)
+  let updatedAt = null;
 
   function el(tagName, className, text) {
     const e = document.createElement(tagName);
@@ -73,16 +104,46 @@
     return card;
   }
 
+  function niceDate(key) {
+    const [y, m, d] = key.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  }
+
+  function render() {
+    const day = days[index];
+    cardsEl.replaceChildren();
+    day.words.forEach((w) => cardsEl.append(makeCard(w)));
+    cardsEl.style.gridTemplateColumns = day.words.length === 1 ? "1fr" : "";
+
+    // replay the fade-in animation
+    cardsEl.style.animation = "none"; void cardsEl.offsetWidth; cardsEl.style.animation = "";
+
+    $("dayLabel").textContent = (index === 0 ? "Today · " : "") + niceDate(day.date);
+    olderBtn.disabled = index >= days.length - 1;
+    newerBtn.disabled = index === 0;
+    todayBtn.hidden = index === 0;
+    $("updated").textContent = index === 0 && updatedAt
+      ? "Updated " + new Date(updatedAt).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
+      : "Looking back at an earlier day";
+  }
+
+  olderBtn.addEventListener("click", () => { if (index < days.length - 1) { index++; render(); } });
+  newerBtn.addEventListener("click", () => { if (index > 0) { index--; render(); } });
+  todayBtn.addEventListener("click", () => { index = 0; render(); });
+
   fetch(WORKER_URL)
     .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(data => {
-      if (!data.words || !data.words.length) throw new Error("No words yet");
-      data.words.forEach(w => cardsEl.append(makeCard(w)));
-      if (data.words.length === 1) cardsEl.style.gridTemplateColumns = "1fr";
+      updatedAt = data.updatedAt;
+      days = (data.days && data.days.length)
+        ? data.days
+        : (data.words && data.words.length ? [{ date: (data.updatedAt || "").slice(0, 10), words: data.words }] : []);
+      if (!days.length) throw new Error("No words yet");
+
       statusEl.hidden = true;
+      navEl.hidden = false;
       cardsEl.hidden = false;
-      document.getElementById("updated").textContent =
-        "Updated " + new Date(data.updatedAt).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+      render();
     })
     .catch(() => {
       statusEl.textContent = "Today's words aren't available right now. Please check back soon!";

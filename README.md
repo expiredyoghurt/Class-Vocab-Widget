@@ -1,6 +1,6 @@
 # Class Words of the Day — Cloudflare Worker + Google Sites Widget
 
-Every day (Monday–Sunday) a Cloudflare Worker collects the Word of the Day from up to four sources, saves them, and serves them to a pretty widget on your Google Site.
+Every day (Monday–Sunday) a Cloudflare Worker collects the Word of the Day from up to four sources, saves them, and serves them to a pretty widget on your Google Site. The widget has **◀ Previous day / Next day ▶** buttons and a **↩ Back to today** button, so students can look back at earlier words (the last 14 days are kept).
 
 | Source | How it's read |
 |---|---|
@@ -101,10 +101,23 @@ Then open the plain address (without `/refresh…`). That's what the widget read
    `const WORKER_URL = "https://class-vocab-widget.YOUR-SUBDOMAIN.workers.dev";`
 3. Select and copy **the whole file**.
 4. In Google Sites: **Insert → Embed → Embed code** tab → paste → **Next → Insert**.
-5. Drag the box to roughly **620 px tall** (taller if you want phones to show all four cards).
+5. Drag the box to roughly **680 px tall**.
 6. **Publish** your site.
 
 ---
+
+## Previous days: how it works
+
+- Each daily run saves that day's words alongside the earlier days.
+- History **starts building from your first run**, so at first the Previous day button is greyed out. It fills up over the following days. Past days can't be backfilled.
+- Running the Step 6 test link again on the same day **replaces** today's entry; it doesn't create an extra day.
+
+## Updating an older version of this project
+
+If you already deployed the first version of this package:
+1. On GitHub, open `src/index.js` → pencil icon → replace everything with the new file's contents → Commit. Cloudflare redeploys by itself.
+2. Open `google-sites-widget.html`, set your `WORKER_URL`, copy it all, and paste it into your Google Sites embed (replacing the old code).
+3. Run the Step 6 test link once. Your earlier single-day data isn't carried over; history starts fresh.
 
 ## Customising
 
@@ -121,6 +134,10 @@ To convert: local time minus your UTC offset = UTC hour. If that falls on the pr
 
 **Remove a source** (e.g. NYT): in `src/index.js`, delete its line in the `SOURCES` list (near the bottom of the helper section). The widget adapts automatically.
 
+**How many past days to keep:** change `HISTORY_DAYS` at the top of `src/index.js` (default 14).
+
+**Which day counts as "today":** change `TIMEZONE` at the top of `src/index.js` (default `"UTC"`). Use your own, e.g. `"Asia/Singapore"` or `"America/New_York"`, so the day labels on the buttons match your calendar.
+
 **How long an old word stays when a source is down:** change `MAX_STALE_DAYS` at the top of `src/index.js`.
 
 ## Troubleshooting
@@ -129,6 +146,7 @@ To convert: local time minus your UTC offset = UTC hour. If that falls on the pr
 - **Build fails mentioning KV / `id`:** you haven't pasted the namespace ID (Step 3), or there's a typo/missing quote.
 - **Widget says "aren't available right now":** open the Worker address directly in a browser. If that shows JSON, re-check that `WORKER_URL` in the embed has no typo or trailing slash. If it shows an error, run Step 6.
 - **Widget shows nothing new next day:** in Cloudflare open the Worker → **Settings → Trigger Events** (cron) and confirm the schedule is listed; also check **Logs** for failures.
+- **The Previous day button is greyed out:** only one day has been saved so far. Check again after tomorrow's run.
 - **A card shows a date from days ago:** that source hasn't published or is failing; its last good word is kept for up to 3 days, then hidden.
 
 ## A note on fair use
